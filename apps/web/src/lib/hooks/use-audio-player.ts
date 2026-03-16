@@ -36,6 +36,8 @@ export interface UseAudioPlayerOptions {
   onChunkNeeded?: (chunkIndex: number) => Promise<void>;
   initialChunkId?: string;
   initialTime?: number;
+  onChapterComplete?: () => void;
+  autoPlay?: boolean;
 }
 
 interface DecodedChunk {
@@ -52,6 +54,8 @@ export function useAudioPlayer({
   onChunkNeeded,
   initialChunkId,
   initialTime,
+  onChapterComplete,
+  autoPlay,
 }: UseAudioPlayerOptions) {
   // Web Audio API refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -72,6 +76,8 @@ export function useAudioPlayer({
   const animationFrameRef = useRef<number | null>(null);
   const hasInitializedRef = useRef<boolean>(false);
   const chunksRef = useRef<AudioChunk[]>(chunks);
+  const onChapterCompleteRef = useRef(onChapterComplete);
+  const autoPlayRef = useRef(autoPlay);
 
   const [state, setState] = useState<AudioPlayerState>({
     isPlaying: false,
@@ -87,10 +93,18 @@ export function useAudioPlayer({
     chapterDuration: 0,
   });
 
-  // Keep chunks ref updated so closures always have latest
+  // Keep refs updated so closures always have latest
   useEffect(() => {
     chunksRef.current = chunks;
   }, [chunks]);
+
+  useEffect(() => {
+    onChapterCompleteRef.current = onChapterComplete;
+  }, [onChapterComplete]);
+
+  useEffect(() => {
+    autoPlayRef.current = autoPlay;
+  }, [autoPlay]);
 
   // Calculate total chapter duration from all chunks
   const chapterDuration = chunks.reduce((total, chunk) => total + chunk.audioDuration, 0);
@@ -302,9 +316,10 @@ export function useAudioPlayer({
           // Preload more chunks
           preloadChunks(nextIndex + 1, 2);
         } else {
-          // End of available chunks
+          // End of available chunks — chapter finished
           isPlayingRef.current = false;
           setState((prev) => ({ ...prev, isPlaying: false }));
+          onChapterCompleteRef.current?.();
         }
       };
 
@@ -604,8 +619,13 @@ export function useAudioPlayer({
 
       // Preload first few chunks
       preloadChunks(chunkIndex, 3);
+
+      // Auto-play if requested (e.g., after chapter auto-advance)
+      if (autoPlayRef.current) {
+        playFromChunk(chunkIndex, initialTime || 0);
+      }
     }
-  }, [chunks, initialChunkId, initialTime, chapterDuration, preloadChunks]);
+  }, [chunks, initialChunkId, initialTime, chapterDuration, preloadChunks, playFromChunk]);
 
   // Update chapter duration when new chunks arrive
   useEffect(() => {

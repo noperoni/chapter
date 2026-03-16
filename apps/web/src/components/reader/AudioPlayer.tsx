@@ -33,6 +33,9 @@ interface AudioPlayerProps {
   onToggleNav?: () => void;
   mode?: ReaderMode;
   onModeChange?: (mode: ReaderMode) => void;
+  // Chapter auto-advance
+  onChapterComplete?: () => void;
+  autoPlay?: boolean;
 }
 
 export function AudioPlayer({
@@ -52,6 +55,8 @@ export function AudioPlayer({
   onToggleNav,
   mode,
   onModeChange,
+  onChapterComplete,
+  autoPlay,
 }: AudioPlayerProps) {
   const { state, controls } = useAudioPlayer({
     bookId,
@@ -61,6 +66,8 @@ export function AudioPlayer({
     onChunkNeeded,
     initialChunkId,
     initialTime,
+    onChapterComplete,
+    autoPlay,
   });
 
   const [isVisible, setIsVisible] = useState(true);

@@ -30,6 +30,7 @@ export default function ReaderPage() {
   const [currentScrollProgress, setCurrentScrollProgress] = useState(0);
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
   const [currentAudioChunk, setCurrentAudioChunk] = useState<string | null>(null);
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
 
   const { progress, updateProgress, saveNow } = useProgress(bookId);
   const { data: chapter, isLoading: chapterLoading } = useChapter(bookId, currentChapter);
@@ -90,6 +91,22 @@ export default function ReaderPage() {
     },
     [bookId, chapterId, generateChunk, refetchChunks, tts.voiceId, tts.speed, tts.temperature]
   );
+
+  // Auto-advance to next chapter when TTS finishes
+  const handleChapterComplete = useCallback(() => {
+    if (structure && currentChapter < structure.chapters.length - 1) {
+      setShouldAutoPlay(true);
+      const newChapter = currentChapter + 1;
+      setCurrentChapter(newChapter);
+      setCurrentScrollProgress(0);
+      updateProgress({
+        chapterIndex: newChapter,
+        chapterId: structure?.chapters[newChapter]?.id,
+        scrollPosition: 0,
+        audioTimestamp: 0,
+      });
+    }
+  }, [currentChapter, structure, updateProgress]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -229,6 +246,7 @@ export default function ReaderPage() {
 
   const goToPrevChapter = () => {
     if (currentChapter > 0) {
+      setShouldAutoPlay(false);
       const newChapter = currentChapter - 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -243,6 +261,7 @@ export default function ReaderPage() {
 
   const goToNextChapter = () => {
     if (structure && currentChapter < structure.chapters.length - 1) {
+      setShouldAutoPlay(false);
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -329,6 +348,7 @@ export default function ReaderPage() {
           chapters={structure.chapters}
           currentChapter={currentChapter}
           onSelectChapter={(index) => {
+            setShouldAutoPlay(false);
             setCurrentChapter(index);
             setCurrentScrollProgress(0);
             setShowNav(false);
@@ -404,6 +424,8 @@ export default function ReaderPage() {
           onToggleNav={() => setShowNav(!showNav)}
           mode={mode}
           onModeChange={handleModeChange}
+          onChapterComplete={handleChapterComplete}
+          autoPlay={shouldAutoPlay}
         />
       ) : null}
     </div>
