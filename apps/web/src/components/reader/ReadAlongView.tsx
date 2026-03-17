@@ -214,7 +214,7 @@ export function ReadAlongView({
                 }}
                 lang="en"
               >
-                {sentences.map((sentence, sIndex) => {
+                {sentences.map((sentence: string, sIndex: number) => {
                   const globalIdx = globalOffset + sIndex;
                   const isActive = isListening && activeSentenceIndex === globalIdx;
 
