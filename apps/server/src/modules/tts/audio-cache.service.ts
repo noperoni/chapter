@@ -195,8 +195,9 @@ export class AudioCacheService {
       return results;
     }
 
-    // Generate first few chunks upfront to provide a buffer for playback
-    const INITIAL_CHUNKS = Math.min(3, chunks.length);
+    // Generate first chunks upfront to provide a buffer for playback
+    // More initial chunks for sentence-level TTS (shorter but more numerous)
+    const INITIAL_CHUNKS = Math.min(8, chunks.length);
 
     for (let i = 0; i < INITIAL_CHUNKS; i++) {
       try {

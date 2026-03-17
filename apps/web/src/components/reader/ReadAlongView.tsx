@@ -1,13 +1,47 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fixEncodingIssues } from '@/lib/text-cleanup';
+
+/**
+ * Split text into sentences using the same logic as the server's TextChunker.
+ * Must stay in sync with server/src/modules/tts/chunker.ts → splitSentencesComplete
+ */
+function splitIntoSentences(text: string): string[] {
+  const sentences: string[] = [];
+  const regex = /[^.!?]+[.!?]+/g;
+  let match;
+  let lastEnd = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    const trimmed = match[0].trim();
+    if (trimmed.length > 0) sentences.push(trimmed);
+    lastEnd = match.index + match[0].length;
+  }
+
+  const remaining = text.substring(lastEnd).trim();
+  if (remaining.length > 0) {
+    sentences.push(remaining);
+  }
+
+  if (sentences.length === 0 && text.trim().length > 0) {
+    sentences.push(text.trim());
+  }
+
+  return sentences;
+}
 
 interface ReadAlongViewProps {
   chapter: any;
   isLoading: boolean;
   onScrollProgress?: (percentage: number) => void;
   initialScrollPosition?: number;
+  /** Index of the currently playing sentence (global across all paragraphs) */
+  activeSentenceIndex?: number | null;
+  /** Called when user clicks a sentence to play from it */
+  onSentenceClick?: (globalSentenceIndex: number) => void;
+  /** Whether listening mode is active (enables click-to-seek and highlighting) */
+  isListening?: boolean;
 }
 
 export function ReadAlongView({
@@ -15,11 +49,42 @@ export function ReadAlongView({
   isLoading,
   onScrollProgress,
   initialScrollPosition,
+  activeSentenceIndex,
+  onSentenceClick,
+  isListening,
 }: ReadAlongViewProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const hasRestoredScroll = useRef(false);
   const restoreTimeouts = useRef<NodeJS.Timeout[]>([]);
+  const activeSentenceRef = useRef<HTMLSpanElement | null>(null);
+
+  // Precompute sentence arrays for all paragraphs
+  const paragraphSentences = useMemo(() => {
+    if (!chapter?.paragraphs) return [];
+    return chapter.paragraphs.map((p: any) =>
+      splitIntoSentences(fixEncodingIssues(p.text))
+    );
+  }, [chapter]);
+
+  // Cumulative sentence offsets per paragraph (for global index calculation)
+  const paragraphOffsets = useMemo(() => {
+    const offsets: number[] = [0];
+    for (let i = 0; i < paragraphSentences.length; i++) {
+      offsets.push(offsets[i] + paragraphSentences[i].length);
+    }
+    return offsets;
+  }, [paragraphSentences]);
+
+  // Auto-scroll to keep the active sentence visible
+  useEffect(() => {
+    if (activeSentenceRef.current && isListening && activeSentenceIndex !== null && activeSentenceIndex !== undefined) {
+      activeSentenceRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [activeSentenceIndex, isListening]);
 
   const handleScroll = useCallback(() => {
     if (!onScrollProgress) return;
@@ -135,7 +200,8 @@ export function ReadAlongView({
 
         <div className="space-y-6">
           {chapter.paragraphs?.map((paragraph: any, pIndex: number) => {
-            const cleanedText = fixEncodingIssues(paragraph.text);
+            const sentences = paragraphSentences[pIndex] || [];
+            const globalOffset = paragraphOffsets[pIndex] || 0;
 
             return (
               <p
@@ -148,7 +214,34 @@ export function ReadAlongView({
                 }}
                 lang="en"
               >
-                {cleanedText}
+                {sentences.map((sentence, sIndex) => {
+                  const globalIdx = globalOffset + sIndex;
+                  const isActive = isListening && activeSentenceIndex === globalIdx;
+
+                  return (
+                    <span key={sIndex}>
+                      <span
+                        ref={isActive ? activeSentenceRef : undefined}
+                        data-sentence-idx={globalIdx}
+                        className={`transition-colors duration-300 ${
+                          isListening ? 'cursor-pointer hover:bg-[hsl(var(--reader-accent))]/10 rounded-sm' : ''
+                        } ${
+                          isActive
+                            ? 'bg-[hsl(var(--reader-accent))]/20 rounded-sm shadow-[0_0_0_3px_hsl(var(--reader-accent)/0.1)]'
+                            : ''
+                        }`}
+                        onClick={
+                          isListening && onSentenceClick
+                            ? () => onSentenceClick(globalIdx)
+                            : undefined
+                        }
+                      >
+                        {sentence}
+                      </span>
+                      {sIndex < sentences.length - 1 ? ' ' : ''}
+                    </span>
+                  );
+                })}
               </p>
             );
           })}

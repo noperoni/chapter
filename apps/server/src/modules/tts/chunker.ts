@@ -13,20 +13,27 @@ export interface ChunkOptions {
   targetSize?: number; // Target characters per chunk (default: 3000)
   maxSize?: number; // Maximum characters per chunk (default: 4000)
   minSize?: number; // Minimum characters per chunk (default: 1000)
+  sentenceLevel?: boolean; // One chunk per sentence for phrase-by-phrase TTS
 }
 
 export class TextChunker {
   private targetSize: number;
   private maxSize: number;
   private minSize: number;
+  private sentenceLevel: boolean;
 
   constructor(options: ChunkOptions = {}) {
     this.targetSize = options.targetSize || 800; // Smaller chunks for faster generation
     this.maxSize = options.maxSize || 1200;
     this.minSize = options.minSize || 400;
+    this.sentenceLevel = options.sentenceLevel || false;
   }
 
   chunk(text: string, globalStartPosition: number = 0): TextChunk[] {
+    if (this.sentenceLevel) {
+      return this.chunkBySentence(text, globalStartPosition);
+    }
+
     const paragraphs = this.splitParagraphs(text);
 
     const chunks: TextChunk[] = [];
@@ -110,6 +117,68 @@ export class TextChunker {
       .filter((p) => p.length > 0);
   }
 
+  private chunkBySentence(text: string, globalStartPosition: number): TextChunk[] {
+    const chunks: TextChunk[] = [];
+    const paragraphs = this.splitParagraphs(text);
+    let searchFrom = 0;
+
+    for (const para of paragraphs) {
+      const paraStart = text.indexOf(para, searchFrom);
+      if (paraStart === -1) continue;
+
+      const sentences = this.splitSentencesComplete(para);
+      let sentenceSearchFrom = 0;
+
+      for (const sentence of sentences) {
+        if (!sentence) continue;
+
+        const sentenceOffset = para.indexOf(sentence, sentenceSearchFrom);
+        if (sentenceOffset === -1) continue;
+
+        const absoluteStart = paraStart + sentenceOffset;
+
+        chunks.push({
+          index: chunks.length,
+          text: sentence,
+          startPosition: globalStartPosition + absoluteStart,
+          endPosition: globalStartPosition + absoluteStart + sentence.length,
+          hash: this.createHash(sentence),
+          wordCount: this.countWords(sentence),
+        });
+
+        sentenceSearchFrom = sentenceOffset + sentence.length;
+      }
+
+      searchFrom = paraStart + para.length;
+    }
+
+    return chunks;
+  }
+
+  private splitSentencesComplete(text: string): string[] {
+    const sentences: string[] = [];
+    const regex = /[^.!?]+[.!?]+/g;
+    let match;
+    let lastEnd = 0;
+
+    while ((match = regex.exec(text)) !== null) {
+      const trimmed = match[0].trim();
+      if (trimmed.length > 0) sentences.push(trimmed);
+      lastEnd = match.index + match[0].length;
+    }
+
+    const remaining = text.substring(lastEnd).trim();
+    if (remaining.length > 0) {
+      sentences.push(remaining);
+    }
+
+    if (sentences.length === 0 && text.trim().length > 0) {
+      sentences.push(text.trim());
+    }
+
+    return sentences;
+  }
+
   private splitSentences(text: string): string[] {
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
     return sentences.map((s) => s.trim()).filter((s) => s.length > 0);
@@ -140,3 +209,4 @@ export function createCacheHash(text: string, voiceId: string, settings: any = {
 }
 
 export const chunker = new TextChunker();
+export const sentenceChunker = new TextChunker({ sentenceLevel: true });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useBook, useBookStructure, useChapter } from '@/lib/hooks/use-books';
@@ -31,6 +31,9 @@ export default function ReaderPage() {
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
   const [currentAudioChunk, setCurrentAudioChunk] = useState<string | null>(null);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
+  const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(null);
+  const [seekToSentence, setSeekToSentence] = useState<{ index: number; seq: number } | null>(null);
+  const seekSeqRef = useRef(0);
 
   const { progress, updateProgress, saveNow } = useProgress(bookId);
   const { data: chapter, isLoading: chapterLoading } = useChapter(bookId, currentChapter);
@@ -92,10 +95,32 @@ export default function ReaderPage() {
     [bookId, chapterId, generateChunk, refetchChunks, tts.voiceId, tts.speed, tts.temperature]
   );
 
+  // Track which sentence (chunk) is currently playing for highlighting
+  const handleChunkIndexChange = useCallback(
+    (chunkIndex: number) => {
+      setActiveSentenceIndex(chunkIndex);
+    },
+    []
+  );
+
+  // Handle sentence click → seek audio to that chunk
+  const handleSentenceClick = useCallback(
+    (globalSentenceIndex: number) => {
+      if (mode === 'listening') {
+        seekSeqRef.current++;
+        setSeekToSentence({ index: globalSentenceIndex, seq: seekSeqRef.current });
+        setActiveSentenceIndex(globalSentenceIndex);
+      }
+    },
+    [mode]
+  );
+
   // Auto-advance to next chapter when TTS finishes
   const handleChapterComplete = useCallback(() => {
     if (structure && currentChapter < structure.chapters.length - 1) {
       setShouldAutoPlay(true);
+      setActiveSentenceIndex(null);
+      setSeekToSentence(null);
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -247,6 +272,8 @@ export default function ReaderPage() {
   const goToPrevChapter = () => {
     if (currentChapter > 0) {
       setShouldAutoPlay(false);
+      setActiveSentenceIndex(null);
+      setSeekToSentence(null);
       const newChapter = currentChapter - 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -262,6 +289,8 @@ export default function ReaderPage() {
   const goToNextChapter = () => {
     if (structure && currentChapter < structure.chapters.length - 1) {
       setShouldAutoPlay(false);
+      setActiveSentenceIndex(null);
+      setSeekToSentence(null);
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -349,6 +378,8 @@ export default function ReaderPage() {
           currentChapter={currentChapter}
           onSelectChapter={(index) => {
             setShouldAutoPlay(false);
+            setActiveSentenceIndex(null);
+            setSeekToSentence(null);
             setCurrentChapter(index);
             setCurrentScrollProgress(0);
             setShowNav(false);
@@ -364,6 +395,9 @@ export default function ReaderPage() {
           isLoading={chapterLoading}
           onScrollProgress={handleScrollProgress}
           initialScrollPosition={isProgressRestored ? progress?.scrollPosition : undefined}
+          activeSentenceIndex={mode === 'listening' ? activeSentenceIndex : null}
+          onSentenceClick={handleSentenceClick}
+          isListening={mode === 'listening'}
         />
       </div>
 
@@ -426,6 +460,9 @@ export default function ReaderPage() {
           onModeChange={handleModeChange}
           onChapterComplete={handleChapterComplete}
           autoPlay={shouldAutoPlay}
+          onChunkIndexChange={handleChunkIndexChange}
+          seekToChunk={seekToSentence?.index ?? null}
+          seekKey={seekToSentence?.seq ?? null}
         />
       ) : null}
     </div>

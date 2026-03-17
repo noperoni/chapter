@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { kokoroService } from './kokoro.service';
 import { audioCacheService } from './audio-cache.service';
-import { chunker } from './chunker';
+import { sentenceChunker } from './chunker';
 import { prisma } from '../../core/database';
 
 const generateChapterSchema = z.object({
@@ -131,7 +131,7 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
           return reply.code(404).send({ error: 'Chapter not found' });
         }
 
-        const chunks = chunker.chunk(chapter.textContent, chapter.startPosition);
+        const chunks = sentenceChunker.chunk(chapter.textContent, chapter.startPosition);
 
         const audioChunks = await audioCacheService.generateChapterAudio(
           bookId,
@@ -240,7 +240,7 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
           return reply.code(404).send({ error: 'Chapter not found' });
         }
 
-        const chunks = chunker.chunk(chapter.textContent, chapter.startPosition);
+        const chunks = sentenceChunker.chunk(chapter.textContent, chapter.startPosition);
 
         if (index >= chunks.length) {
           return reply.code(404).send({ error: 'Chunk index out of range' });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import {
   Play,
@@ -36,6 +36,10 @@ interface AudioPlayerProps {
   // Chapter auto-advance
   onChapterComplete?: () => void;
   autoPlay?: boolean;
+  // Sentence-level tracking
+  onChunkIndexChange?: (chunkIndex: number) => void;
+  seekToChunk?: number | null;
+  seekKey?: number | null;
 }
 
 export function AudioPlayer({
@@ -57,18 +61,31 @@ export function AudioPlayer({
   onModeChange,
   onChapterComplete,
   autoPlay,
+  onChunkIndexChange,
+  seekToChunk,
+  seekKey,
 }: AudioPlayerProps) {
   const { state, controls } = useAudioPlayer({
     bookId,
     chapterId,
     chunks,
     onPositionChange,
+    onChunkChange: onChunkIndexChange,
     onChunkNeeded,
     initialChunkId,
     initialTime,
     onChapterComplete,
     autoPlay,
   });
+
+  // Handle external seek-to-chunk requests (e.g., sentence click)
+  const lastSeekKeyRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (seekToChunk !== null && seekToChunk !== undefined && seekKey !== lastSeekKeyRef.current) {
+      lastSeekKeyRef.current = seekKey ?? null;
+      controls.loadChunk(seekToChunk, true);
+    }
+  }, [seekToChunk, seekKey, controls]);
 
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
