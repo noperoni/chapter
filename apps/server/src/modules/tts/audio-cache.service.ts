@@ -79,25 +79,37 @@ export class AudioCacheService {
 
     const audioSize = ttsResult.audioData.length;
 
-    const cached = await prisma.tTSCache.create({
-      data: {
-        contentHash,
-        bookId: options.bookId,
-        chapterId: options.chapterId,
-        startPosition: options.startPosition,
-        endPosition: options.endPosition,
-        textContent: options.text,
-        voiceId: options.voiceId,
-        settings: options.settings as any,
-        audioPath,
-        audioFormat: ttsResult.format,
-        audioSize,
-        audioDuration: ttsResult.duration,
-        wordTimestamps: ttsResult.wordTimestamps as any,
-        accessCount: 1,
-        lastAccessed: new Date(),
-      },
-    });
+    let cached;
+    try {
+      cached = await prisma.tTSCache.create({
+        data: {
+          contentHash,
+          bookId: options.bookId,
+          chapterId: options.chapterId,
+          startPosition: options.startPosition,
+          endPosition: options.endPosition,
+          textContent: options.text,
+          voiceId: options.voiceId,
+          settings: options.settings as any,
+          audioPath,
+          audioFormat: ttsResult.format,
+          audioSize,
+          audioDuration: ttsResult.duration,
+          wordTimestamps: ttsResult.wordTimestamps as any,
+          accessCount: 1,
+          lastAccessed: new Date(),
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        // Duplicate contentHash — another request already cached this text.
+        // Clean up the duplicate audio file and return the existing entry.
+        try { await deleteFile(audioPath); } catch {}
+        const existing = await this.getCachedAudio(contentHash);
+        if (existing) return existing;
+      }
+      throw error;
+    }
 
     await this.evictIfNeeded();
 
