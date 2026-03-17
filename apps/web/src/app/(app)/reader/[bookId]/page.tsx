@@ -193,11 +193,19 @@ export default function ReaderPage() {
   // Generate audio when switching to listening mode
   useEffect(() => {
     const generateAudioIfNeeded = async () => {
-      // Check if we need to generate: no chunks, or chunks use different voice
+      // Detect stale chunks from old chunking scheme (large text spans
+      // indicate 800-char paragraph-level chunks, not sentence-level)
+      const hasStaleChunks =
+        audioChunks &&
+        audioChunks.length > 0 &&
+        audioChunks.some((c: any) => (c.endPosition - c.startPosition) > 400);
+
+      // Check if we need to generate: no chunks, wrong voice, or stale chunking
       const needsGeneration =
         !audioChunks ||
         audioChunks.length === 0 ||
-        (audioChunks[0]?.voiceId && audioChunks[0].voiceId !== tts.voiceId);
+        (audioChunks[0]?.voiceId && audioChunks[0].voiceId !== tts.voiceId) ||
+        hasStaleChunks;
 
       if (mode === 'listening' && chapterId && needsGeneration) {
         try {

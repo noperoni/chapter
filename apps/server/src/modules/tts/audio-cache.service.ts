@@ -281,6 +281,27 @@ export class AudioCacheService {
     };
   }
 
+  async clearChapterCache(bookId: string, chapterId: string): Promise<void> {
+    const entries = await prisma.tTSCache.findMany({
+      where: { bookId, chapterId },
+    });
+
+    for (const entry of entries) {
+      try {
+        await deleteFile(entry.audioPath);
+      } catch (error) {
+        // File may already be gone
+      }
+    }
+
+    if (entries.length > 0) {
+      await prisma.tTSCache.deleteMany({
+        where: { bookId, chapterId },
+      });
+      console.log(`Cleared ${entries.length} cached chunks for chapter ${chapterId}`);
+    }
+  }
+
   async clearCache(): Promise<void> {
     const entries = await prisma.tTSCache.findMany();
 

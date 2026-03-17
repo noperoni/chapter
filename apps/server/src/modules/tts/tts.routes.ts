@@ -131,6 +131,11 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
           return reply.code(404).send({ error: 'Chapter not found' });
         }
 
+        // Clear old cached chunks for this chapter (may be from a different
+        // chunking scheme or voice) to prevent stale entries from mixing with
+        // new sentence-level chunks in the /chapters endpoint response
+        await audioCacheService.clearChapterCache(bookId, chapterId);
+
         const chunks = sentenceChunker.chunk(chapter.textContent, chapter.startPosition);
 
         const audioChunks = await audioCacheService.generateChapterAudio(
