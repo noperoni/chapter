@@ -225,8 +225,10 @@ export function useAudioPlayer({
     async (chunkIndex: number, offsetWithinChunk: number = 0) => {
       const ctx = ensureAudioContext();
 
-      // Stop current playback
+      // Stop current playback — null onended first to prevent stale
+      // handlers from firing and advancing to the next chunk
       if (currentSourceRef.current) {
+        currentSourceRef.current.onended = null;
         try {
           currentSourceRef.current.stop();
         } catch (e) {
@@ -235,6 +237,7 @@ export function useAudioPlayer({
         currentSourceRef.current = null;
       }
       if (nextSourceRef.current) {
+        nextSourceRef.current.onended = null;
         try {
           nextSourceRef.current.stop();
         } catch (e) {}
@@ -412,8 +415,9 @@ export function useAudioPlayer({
   // Toggle play/pause
   const togglePlay = useCallback(async () => {
     if (state.isPlaying) {
-      // Pause
+      // Pause — null onended to prevent stale advancement
       if (currentSourceRef.current) {
+        currentSourceRef.current.onended = null;
         try {
           currentSourceRef.current.stop();
         } catch (e) {}

@@ -59,13 +59,33 @@ export function ReadAlongView({
   const restoreTimeouts = useRef<NodeJS.Timeout[]>([]);
   const activeSentenceRef = useRef<HTMLSpanElement | null>(null);
 
-  // Precompute sentence arrays for all paragraphs
+  // Detect if paragraph 0 is a duplicate of the chapter title (already rendered in header).
+  // The EPUB parser includes <h1> title text in textContent, so the server creates
+  // audio chunks for it. We skip rendering it as a paragraph but account for the
+  // chunk offset so sentence indices still map correctly to server chunks.
+  const titleParagraphCount = useMemo(() => {
+    if (!chapter?.title || !chapter?.paragraphs?.length) return 0;
+    const firstParaText = fixEncodingIssues(chapter.paragraphs[0].text).trim();
+    return firstParaText === chapter.title.trim() ? 1 : 0;
+  }, [chapter]);
+
+  // Precompute sentence arrays for all paragraphs (excluding title paragraph)
   const paragraphSentences = useMemo(() => {
     if (!chapter?.paragraphs) return [];
-    return chapter.paragraphs.map((p: any) =>
+    return chapter.paragraphs.slice(titleParagraphCount).map((p: any) =>
       splitIntoSentences(fixEncodingIssues(p.text))
     );
-  }, [chapter]);
+  }, [chapter, titleParagraphCount]);
+
+  // Number of server chunks consumed by skipped title paragraph(s)
+  const chunkOffset = useMemo(() => {
+    if (!chapter?.paragraphs || titleParagraphCount === 0) return 0;
+    let offset = 0;
+    for (let i = 0; i < titleParagraphCount; i++) {
+      offset += splitIntoSentences(fixEncodingIssues(chapter.paragraphs[i].text)).length;
+    }
+    return offset;
+  }, [chapter, titleParagraphCount]);
 
   // Cumulative sentence offsets per paragraph (for global index calculation)
   const paragraphOffsets = useMemo(() => {
@@ -199,7 +219,7 @@ export function ReadAlongView({
         )}
 
         <div className="space-y-6">
-          {chapter.paragraphs?.map((paragraph: any, pIndex: number) => {
+          {chapter.paragraphs?.slice(titleParagraphCount).map((paragraph: any, pIndex: number) => {
             const sentences = paragraphSentences[pIndex] || [];
             const globalOffset = paragraphOffsets[pIndex] || 0;
 
@@ -215,14 +235,15 @@ export function ReadAlongView({
                 lang="en"
               >
                 {sentences.map((sentence: string, sIndex: number) => {
-                  const globalIdx = globalOffset + sIndex;
-                  const isActive = isListening && activeSentenceIndex === globalIdx;
+                  // chunkOffset maps UI sentence indices to server chunk indices
+                  const chunkIdx = chunkOffset + globalOffset + sIndex;
+                  const isActive = isListening && activeSentenceIndex === chunkIdx;
 
                   return (
                     <span key={sIndex}>
                       <span
                         ref={isActive ? activeSentenceRef : undefined}
-                        data-sentence-idx={globalIdx}
+                        data-sentence-idx={chunkIdx}
                         className={`transition-colors duration-300 ${
                           isListening ? 'cursor-pointer hover:bg-[hsl(var(--reader-accent))]/10 rounded-sm' : ''
                         } ${
@@ -232,7 +253,7 @@ export function ReadAlongView({
                         }`}
                         onClick={
                           isListening && onSentenceClick
-                            ? () => onSentenceClick(globalIdx)
+                            ? () => onSentenceClick(chunkIdx)
                             : undefined
                         }
                       >
