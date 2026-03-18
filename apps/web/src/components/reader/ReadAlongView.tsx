@@ -42,6 +42,10 @@ interface ReadAlongViewProps {
   activeSentenceIndex?: number | null;
   /** Called when user clicks a sentence to play from it */
   onSentenceClick?: (globalSentenceIndex: number) => void;
+  /** Number of chunks available (generated) — sentences beyond this are dimmed in debug mode */
+  availableChunks?: number;
+  /** Show debug indicators (generation frontier, chunk indices) */
+  debugMode?: boolean;
   /** Whether listening mode is active (enables click-to-seek and highlighting) */
   isListening?: boolean;
 }
@@ -53,6 +57,8 @@ export function ReadAlongView({
   initialScrollPosition,
   activeSentenceIndex,
   onSentenceClick,
+  availableChunks,
+  debugMode,
   isListening,
 }: ReadAlongViewProps) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -240,17 +246,27 @@ export function ReadAlongView({
                   // chunkOffset maps UI sentence indices to server chunk indices
                   const chunkIdx = chunkOffset + globalOffset + sIndex;
                   const isActive = isListening && activeSentenceIndex === chunkIdx;
+                  const isAvailable = availableChunks === undefined || chunkIdx < availableChunks;
+                  const isFrontier = debugMode && isListening && availableChunks !== undefined && chunkIdx === availableChunks - 1;
 
                   return (
                     <span key={sIndex}>
                       <span
                         ref={isActive ? activeSentenceRef : undefined}
                         data-sentence-idx={chunkIdx}
-                        className={`transition-colors duration-300 ${
+                        className={`transition-all duration-300 ${
                           isListening ? 'cursor-pointer hover:bg-[hsl(var(--reader-accent))]/10 rounded-sm' : ''
                         } ${
                           isActive
                             ? 'bg-[hsl(var(--reader-accent))]/20 rounded-sm shadow-[0_0_0_3px_hsl(var(--reader-accent)/0.1)]'
+                            : ''
+                        } ${
+                          debugMode && isListening && !isAvailable
+                            ? 'opacity-35'
+                            : ''
+                        } ${
+                          isFrontier
+                            ? 'border-b border-dashed border-emerald-400/50'
                             : ''
                         }`}
                         onClick={
@@ -259,6 +275,11 @@ export function ReadAlongView({
                             : undefined
                         }
                       >
+                        {debugMode && isListening && (
+                          <span className="text-[9px] font-mono text-[hsl(var(--reader-text))]/25 align-super mr-0.5 select-none">
+                            {chunkIdx}
+                          </span>
+                        )}
                         {sentence}
                       </span>
                       {sIndex < sentences.length - 1 ? ' ' : ''}

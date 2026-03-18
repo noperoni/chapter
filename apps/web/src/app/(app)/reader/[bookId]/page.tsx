@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { Terminal } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useBook, useBookStructure, useChapter } from '@/lib/hooks/use-books';
 import { useGenerateAudio, useAudioChunks, useGenerateChunk } from '@/lib/hooks/use-tts';
@@ -36,6 +37,20 @@ export default function ReaderPage() {
   const [seekToSentence, setSeekToSentence] = useState<{ index: number; seq: number } | null>(null);
   const seekSeqRef = useRef(0);
   const [totalChunks, setTotalChunks] = useState<number | null>(null);
+  const [debugMode, setDebugMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('chapter_tts_debug') === '1';
+    }
+    return false;
+  });
+
+  const toggleDebug = useCallback(() => {
+    setDebugMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('chapter_tts_debug', next ? '1' : '0');
+      return next;
+    });
+  }, []);
 
   const { progress, updateProgress, saveNow } = useProgress(bookId);
   const { data: chapter, isLoading: chapterLoading } = useChapter(bookId, currentChapter);
@@ -412,6 +427,8 @@ export default function ReaderPage() {
           initialScrollPosition={isProgressRestored ? progress?.scrollPosition : undefined}
           activeSentenceIndex={mode === 'listening' ? activeSentenceIndex : null}
           onSentenceClick={handleSentenceClick}
+          availableChunks={mode === 'listening' ? (audioChunks?.length || 0) : undefined}
+          debugMode={debugMode}
           isListening={mode === 'listening'}
         />
       </div>
@@ -481,8 +498,23 @@ export default function ReaderPage() {
         />
       ) : null}
 
-      {/* TTS Telemetry — visible in listening mode */}
+      {/* Debug toggle — visible in listening mode */}
       {mode === 'listening' && (
+        <button
+          onClick={toggleDebug}
+          className={`fixed top-4 left-4 z-50 flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ${
+            debugMode
+              ? 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-400'
+              : 'bg-[hsl(var(--reader-text))]/5 border border-[hsl(var(--reader-text))]/10 text-[hsl(var(--reader-text))]/30 hover:text-[hsl(var(--reader-text))]/50'
+          }`}
+          title={debugMode ? 'Hide TTS debug info' : 'Show TTS debug info'}
+        >
+          <Terminal className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {/* TTS Telemetry — visible in listening mode when debug is on */}
+      {mode === 'listening' && debugMode && (
         <TTSTelemetry
           totalChunks={totalChunks}
           generatedChunks={audioChunks?.length || 0}
