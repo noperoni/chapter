@@ -14,6 +14,7 @@ import { ReaderMode } from '@/components/reader/ModeToggle';
 import { ReadAlongView } from '@/components/reader/ReadAlongView';
 import { UnifiedControls } from '@/components/reader/unified-controls';
 import { readingToAudioPosition, audioToReadingPosition } from '@/lib/position-sync';
+import { TTSTelemetry } from '@/components/reader/TTSTelemetry';
 
 export default function ReaderPage() {
   const params = useParams();
@@ -34,6 +35,7 @@ export default function ReaderPage() {
   const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(null);
   const [seekToSentence, setSeekToSentence] = useState<{ index: number; seq: number } | null>(null);
   const seekSeqRef = useRef(0);
+  const [totalChunks, setTotalChunks] = useState<number | null>(null);
 
   const { progress, updateProgress, saveNow } = useProgress(bookId);
   const { data: chapter, isLoading: chapterLoading } = useChapter(bookId, currentChapter);
@@ -121,6 +123,7 @@ export default function ReaderPage() {
       setShouldAutoPlay(true);
       setActiveSentenceIndex(null);
       setSeekToSentence(null);
+      setTotalChunks(null);
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -209,7 +212,7 @@ export default function ReaderPage() {
 
       if (mode === 'listening' && chapterId && needsGeneration) {
         try {
-          await generate({
+          const result = await generate({
             bookId,
             chapterId,
             voiceId: tts.voiceId,
@@ -218,6 +221,7 @@ export default function ReaderPage() {
               temperature: tts.temperature,
             },
           });
+          if (result?.totalChunks) setTotalChunks(result.totalChunks);
           refetchChunks();
         } catch (error) {
           console.error('Failed to generate audio:', error);
@@ -282,6 +286,7 @@ export default function ReaderPage() {
       setShouldAutoPlay(false);
       setActiveSentenceIndex(null);
       setSeekToSentence(null);
+      setTotalChunks(null);
       const newChapter = currentChapter - 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -299,6 +304,7 @@ export default function ReaderPage() {
       setShouldAutoPlay(false);
       setActiveSentenceIndex(null);
       setSeekToSentence(null);
+      setTotalChunks(null);
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       setCurrentScrollProgress(0);
@@ -388,6 +394,7 @@ export default function ReaderPage() {
             setShouldAutoPlay(false);
             setActiveSentenceIndex(null);
             setSeekToSentence(null);
+            setTotalChunks(null);
             setCurrentChapter(index);
             setCurrentScrollProgress(0);
             setShowNav(false);
@@ -473,6 +480,21 @@ export default function ReaderPage() {
           seekKey={seekToSentence?.seq ?? null}
         />
       ) : null}
+
+      {/* TTS Telemetry — visible in listening mode */}
+      {mode === 'listening' && (
+        <TTSTelemetry
+          totalChunks={totalChunks}
+          generatedChunks={audioChunks?.length || 0}
+          activeChunkIndex={activeSentenceIndex}
+          isGenerating={isGenerating}
+          isChunkLoading={false}
+          voiceId={tts.voiceId}
+          speed={tts.speed}
+          totalAudioSize={audioChunks?.reduce((sum: number, c: any) => sum + (c.audioSize || 0), 0) || 0}
+          totalAudioDuration={audioChunks?.reduce((sum: number, c: any) => sum + (c.audioDuration || 0), 0) || 0}
+        />
+      )}
     </div>
   );
 }
