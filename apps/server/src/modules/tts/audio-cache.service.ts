@@ -34,7 +34,7 @@ export class AudioCacheService {
   }
 
   async getOrGenerateAudio(options: GenerateAudioOptions): Promise<CachedAudio> {
-    const contentHash = createCacheHash(options.text, options.voiceId, options.settings);
+    const contentHash = createCacheHash(options.text, options.voiceId, options.settings, options.chapterId);
 
     const cached = await this.getCachedAudio(contentHash);
     if (cached) {

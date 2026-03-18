@@ -197,12 +197,13 @@ export class TextChunker {
   }
 }
 
-export function createCacheHash(text: string, voiceId: string, settings: any = {}): string {
+export function createCacheHash(text: string, voiceId: string, settings: any = {}, chapterId?: string): string {
   const combined = JSON.stringify({
     text,
     voiceId,
     speed: settings.speed || 1.0,
     temperature: settings.temperature || 0.7,
+    chapterId,
   });
 
   return crypto.createHash('sha256').update(combined).digest('hex');
