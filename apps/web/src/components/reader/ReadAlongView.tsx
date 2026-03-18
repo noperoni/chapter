@@ -9,7 +9,9 @@ import { fixEncodingIssues } from '@/lib/text-cleanup';
  */
 function splitIntoSentences(text: string): string[] {
   const sentences: string[] = [];
-  const regex = /[^.!?]+[.!?]+/g;
+  // Match sentence text + punctuation + any trailing closing quotes/brackets
+  // Must stay in sync with server's splitSentencesComplete in chunker.ts
+  const regex = /[^.!?]+[.!?]+["\u201D'\u2019)\]]*\s*/g;
   let match;
   let lastEnd = 0;
 

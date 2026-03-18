@@ -157,7 +157,8 @@ export class TextChunker {
 
   private splitSentencesComplete(text: string): string[] {
     const sentences: string[] = [];
-    const regex = /[^.!?]+[.!?]+/g;
+    // Match sentence text + punctuation + any trailing closing quotes/brackets
+    const regex = /[^.!?]+[.!?]+["\u201D'\u2019)\]]*\s*/g;
     let match;
     let lastEnd = 0;
 
@@ -180,7 +181,7 @@ export class TextChunker {
   }
 
   private splitSentences(text: string): string[] {
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    const sentences = text.match(/[^.!?]+[.!?]+["\u201D'\u2019)\]]*/g) || [text];
     return sentences.map((s) => s.trim()).filter((s) => s.length > 0);
   }
 

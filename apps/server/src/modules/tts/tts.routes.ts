@@ -137,6 +137,7 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
         await audioCacheService.clearChapterCache(bookId, chapterId);
 
         const chunks = sentenceChunker.chunk(chapter.textContent, chapter.startPosition);
+        console.log(`[TTS] Chapter "${chapter.title}" (${chapterId}): ${chunks.length} sentence chunks from ${chapter.textContent.length} chars`);
 
         const audioChunks = await audioCacheService.generateChapterAudio(
           bookId,
@@ -149,6 +150,7 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
         return reply.send({
           chapterId,
           chapterTitle: chapter.title,
+          totalChunks: chunks.length,
           chunks: audioChunks.map((chunk, index) => ({
             id: chunk.id,
             index,
