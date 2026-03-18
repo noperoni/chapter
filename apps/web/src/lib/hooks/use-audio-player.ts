@@ -557,12 +557,12 @@ export function useAudioPlayer({
     [chunks, onChunkNeeded, playFromChunk, fetchAndDecodeChunk]
   );
 
-  // Handle pending chunk loads
+  // Handle pending chunk loads — auto-play since the user explicitly requested this chunk
   useEffect(() => {
     const pendingIndex = pendingChunkRef.current;
     if (pendingIndex !== null && chunks[pendingIndex]) {
       pendingChunkRef.current = null;
-      loadChunk(pendingIndex);
+      loadChunk(pendingIndex, true);
     }
   }, [chunks, loadChunk]);
 
