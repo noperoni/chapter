@@ -219,3 +219,63 @@ function extractTitle(html: string): string | undefined {
 function countWords(text: string): number {
   return text.split(/\s+/).filter((word) => word.length > 0).length;
 }
+
+function resolveRelativePath(base: string, relative: string): string {
+  // Split base into segments (drop the filename if present)
+  const baseSegments = base.split('/').filter(Boolean);
+  const relSegments = relative.split('/').filter(Boolean);
+
+  const result = [...baseSegments];
+  for (const seg of relSegments) {
+    if (seg === '..') {
+      result.pop();
+    } else if (seg !== '.') {
+      result.push(seg);
+    }
+  }
+  return result.join('/');
+}
+
+const ASSET_MIME_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.ico': 'image/x-icon',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+};
+
+export async function extractEpubAsset(
+  epubBuffer: Buffer,
+  chapterHref: string,
+  assetSrc: string
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const zip = await JSZip.loadAsync(epubBuffer);
+
+  const containerXml = await zip.file('META-INF/container.xml')?.async('string');
+  if (!containerXml) return null;
+
+  const container = await parseXML(containerXml);
+  const opfPath = container.container.rootfiles[0].rootfile[0].$['full-path'];
+  const opfDir = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
+
+  // The chapter href is relative to opfDir, so the chapter's directory is:
+  const chapterDir = chapterHref.substring(0, chapterHref.lastIndexOf('/') + 1);
+  const baseDir = opfDir + chapterDir;
+
+  // Resolve the asset src relative to the chapter's directory
+  const resolvedPath = resolveRelativePath(baseDir, assetSrc);
+
+  const file = zip.file(resolvedPath);
+  if (!file) return null;
+
+  const arrayBuffer = await file.async('arraybuffer');
+  const ext = ('.' + (assetSrc.split('.').pop() || '')).toLowerCase();
+  const contentType = ASSET_MIME_TYPES[ext] || 'application/octet-stream';
+
+  return { buffer: Buffer.from(arrayBuffer), contentType };
+}

@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/lib/stores/settings-store';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { ChapterNav } from '@/components/reader/chapter-nav';
 import { AudioPlayer } from '@/components/reader/AudioPlayer';
+import { ChapterReader } from '@/components/reader/ChapterReader';
 import { ReaderMode } from '@/components/reader/ModeToggle';
 import { ReadAlongView } from '@/components/reader/ReadAlongView';
 import { UnifiedControls } from '@/components/reader/unified-controls';
@@ -418,19 +419,29 @@ export default function ReaderPage() {
         />
       )}
 
-      {/* Unified reading content - same UI for both modes */}
+      {/* Reading content — rich HTML in reading mode, sentence-split in listening mode */}
       <div className="pb-24">
-        <ReadAlongView
-          chapter={chapter}
-          isLoading={chapterLoading}
-          onScrollProgress={handleScrollProgress}
-          initialScrollPosition={isProgressRestored ? progress?.scrollPosition : undefined}
-          activeSentenceIndex={mode === 'listening' ? activeSentenceIndex : null}
-          onSentenceClick={handleSentenceClick}
-          availableChunks={mode === 'listening' ? (audioChunks?.length || 0) : undefined}
-          debugMode={debugMode}
-          isListening={mode === 'listening'}
-        />
+        {mode === 'reading' ? (
+          <ChapterReader
+            chapter={chapter}
+            bookId={bookId}
+            isLoading={chapterLoading}
+            onScrollProgress={handleScrollProgress}
+            initialScrollPosition={isProgressRestored ? progress?.scrollPosition : undefined}
+          />
+        ) : (
+          <ReadAlongView
+            chapter={chapter}
+            isLoading={chapterLoading}
+            onScrollProgress={handleScrollProgress}
+            initialScrollPosition={isProgressRestored ? progress?.scrollPosition : undefined}
+            activeSentenceIndex={activeSentenceIndex}
+            onSentenceClick={handleSentenceClick}
+            availableChunks={audioChunks?.length || 0}
+            debugMode={debugMode}
+            isListening={true}
+          />
+        )}
       </div>
 
       {/* In-place loading overlay for audio generation */}

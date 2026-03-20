@@ -198,6 +198,54 @@ export const booksRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
+  app.get(
+    '/:bookId/epub-asset',
+    {
+      preValidation: async (request, reply) => {
+        try {
+          await request.jwtVerify();
+          return;
+        } catch {
+          const { token } = request.query as { token?: string };
+          if (token) {
+            try {
+              const decoded = app.jwt.verify(token);
+              (request as any).user = decoded;
+              return;
+            } catch {}
+          }
+          reply.code(401).send({ error: 'Unauthorized' });
+        }
+      },
+    },
+    async (request, reply) => {
+      try {
+        const userId = (request.user as any).userId;
+        const { bookId } = request.params as any;
+        const { chapterHref, src } = request.query as { chapterHref: string; src: string };
+
+        if (!chapterHref || !src) {
+          return reply.code(400).send({ error: 'chapterHref and src are required' });
+        }
+
+        const { buffer, contentType } = await booksService.getEpubAsset(
+          userId,
+          bookId,
+          chapterHref,
+          src
+        );
+
+        return reply
+          .type(contentType)
+          .header('Cache-Control', 'public, max-age=604800')
+          .send(buffer);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to fetch asset';
+        return reply.code(404).send({ error: message });
+      }
+    }
+  );
+
   app.delete('/:bookId', async (request, reply) => {
     try {
       const userId = (request.user as any).userId;

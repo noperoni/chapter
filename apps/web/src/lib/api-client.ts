@@ -175,6 +175,12 @@ class APIClient {
     return `/api/books/${bookId}/epub${params}`;
   }
 
+  getEpubAssetUrl(bookId: string, chapterHref: string, src: string): string {
+    const params = new URLSearchParams({ chapterHref, src });
+    if (this.token) params.set('token', this.token);
+    return `${API_URL}/books/${bookId}/epub-asset?${params}`;
+  }
+
   async getAlternativeCovers(bookId: string): Promise<AlternativeCover[]> {
     return this.request<AlternativeCover[]>(`/books/${bookId}/covers/alternatives`);
   }

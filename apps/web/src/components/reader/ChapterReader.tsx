@@ -1,113 +1,67 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { apiClient } from '@/lib/api-client';
+import { fixEncodingIssues } from '@/lib/text-cleanup';
 
 interface ChapterReaderProps {
   chapter: {
     title?: string;
     htmlContent?: string;
-    textContent?: string;
-    paragraphs?: Array<{ text: string }>;
+    href?: string;
   } | null;
+  bookId: string;
   isLoading: boolean;
   onScrollProgress?: (percentage: number) => void;
+  initialScrollPosition?: number;
   className?: string;
 }
 
-// Detect if a line looks like a header/title
-function isHeaderLine(line: string): 'part' | 'chapter' | 'section' | null {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.length > 60) return null;
-
-  // Part headers: "PART ONE", "Part 1", "PART I", etc.
-  if (/^part\s+(\d+|[ivxlc]+|one|two|three|four|five|six|seven|eight|nine|ten)$/i.test(trimmed)) {
-    return 'part';
-  }
-
-  // Chapter headers: "Chapter 1", "CHAPTER ONE", "Chapter I"
-  if (/^chapter\s+(\d+|[ivxlc]+|one|two|three|four|five|six|seven|eight|nine|ten)$/i.test(trimmed)) {
-    return 'chapter';
-  }
-
-  // Standalone number or roman numeral or word number (likely chapter number)
-  if (/^(\d+|[ivxlc]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)$/i.test(trimmed)) {
-    return 'section';
-  }
-
-  // All caps short line (likely a title/header)
-  if (trimmed === trimmed.toUpperCase() && trimmed.length > 2 && trimmed.length < 40 && /[A-Z]/.test(trimmed)) {
-    return 'part';
-  }
-
-  return null;
-}
-
-// Process text content into structured HTML
-function processContent(chapter: ChapterReaderProps['chapter']): string {
-  if (!chapter) return '';
-
-  // If we have HTML content with actual tags, use it
-  if (chapter.htmlContent && /<(p|div|h[1-6]|br)[>\s/]/i.test(chapter.htmlContent)) {
-    return chapter.htmlContent;
-  }
-
-  // Otherwise, process from paragraphs or textContent
-  let lines: string[] = [];
-
-  if (chapter.paragraphs && chapter.paragraphs.length > 0) {
-    lines = chapter.paragraphs.map(p => p.text);
-  } else if (chapter.textContent) {
-    lines = chapter.textContent.split(/\n\n+/).flatMap(block =>
-      block.split(/\n/).filter(line => line.trim())
-    );
-  } else if (chapter.htmlContent) {
-    const text = chapter.htmlContent.replace(/<[^>]+>/g, '\n');
-    lines = text.split(/\n+/).filter(line => line.trim());
-  }
-
-  if (lines.length === 0) return '';
-
-  const htmlParts: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const headerType = isHeaderLine(line);
-
-    if (headerType === 'part') {
-      htmlParts.push(
-        `<h2 style="font-size: 0.8125rem; font-weight: 400; text-align: center; text-transform: uppercase; letter-spacing: 0.3em; margin: 3rem 0 0.75rem; opacity: 0.6;">${line}</h2>`
-      );
-    } else if (headerType === 'chapter') {
-      htmlParts.push(
-        `<h3 style="font-size: 1.25rem; font-weight: 400; text-align: center; margin: 2.5rem 0 2rem; font-style: italic;">${line}</h3>`
-      );
-    } else if (headerType === 'section') {
-      htmlParts.push(
-        `<h4 style="font-size: 1rem; font-weight: 400; text-align: center; margin: 2.5rem 0 1.5rem; opacity: 0.6;">${line}</h4>`
-      );
-    } else {
-      htmlParts.push(`<p>${line}</p>`);
+/**
+ * Rewrite <img src="..."> in EPUB HTML to point at our epub-asset API endpoint.
+ * Skips absolute URLs and data URIs.
+ */
+function rewriteImageUrls(html: string, bookId: string, chapterHref: string): string {
+  return html.replace(
+    /(<img\s+[^>]*?)src=["']([^"']+)["']/gi,
+    (_match, before: string, src: string) => {
+      if (src.startsWith('http') || src.startsWith('data:') || src.startsWith('blob:')) {
+        return `${before}src="${src}"`;
+      }
+      const url = apiClient.getEpubAssetUrl(bookId, chapterHref, src);
+      return `${before}src="${url}"`;
     }
-  }
-
-  return htmlParts.join('\n');
+  );
 }
 
 export function ChapterReader({
   chapter,
+  bookId,
   isLoading,
   onScrollProgress,
+  initialScrollPosition,
   className = '',
 }: ChapterReaderProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const hasRestoredScroll = useRef(false);
+  const restoreTimeouts = useRef<NodeJS.Timeout[]>([]);
 
-  const content = useMemo(() => processContent(chapter), [chapter]);
+  const content = useMemo(() => {
+    if (!chapter?.htmlContent) return '';
+
+    let html = chapter.htmlContent;
+
+    // Rewrite image URLs if we have a chapter href
+    if (chapter.href) {
+      html = rewriteImageUrls(html, bookId, chapter.href);
+    }
+
+    return html;
+  }, [chapter, bookId]);
 
   const handleScroll = useCallback(() => {
-    if (!containerRef.current || !onScrollProgress) return;
-
+    if (!onScrollProgress) return;
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
     const scrollable = scrollHeight - clientHeight;
     const percentage = scrollable > 0 ? (scrollTop / scrollable) * 100 : 0;
@@ -119,13 +73,52 @@ export function ChapterReader({
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
+  // Scroll position restoration
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (
+      initialScrollPosition !== undefined &&
+      initialScrollPosition > 0 &&
+      chapter &&
+      !isLoading &&
+      !hasRestoredScroll.current
+    ) {
+      hasRestoredScroll.current = true;
+      restoreTimeouts.current.forEach(clearTimeout);
+      restoreTimeouts.current = [];
+
+      const restoreScroll = () => {
+        const trackLength = document.documentElement.scrollHeight - window.innerHeight;
+        if (trackLength > 0) {
+          window.scrollTo({
+            top: (initialScrollPosition / 100) * trackLength,
+            behavior: 'instant',
+          });
+        }
+      };
+
+      restoreTimeouts.current = [setTimeout(restoreScroll, 100), setTimeout(restoreScroll, 300)];
+    }
+
+    return () => restoreTimeouts.current.forEach(clearTimeout);
+  }, [chapter, initialScrollPosition, isLoading]);
+
+  // Reset scroll restoration on chapter change
+  useEffect(() => {
+    hasRestoredScroll.current = false;
   }, [chapter]);
+
+  // Fade-in animation
+  useEffect(() => {
+    if (chapter && !isLoading) {
+      setIsVisible(false);
+      const timer = setTimeout(() => setIsVisible(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [chapter, isLoading]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20 bg-[hsl(var(--reader-bg))]">
+      <div className="flex items-center justify-center py-20">
         <svg
           className="animate-spin h-6 w-6 text-muted-foreground"
           xmlns="http://www.w3.org/2000/svg"
@@ -141,25 +134,66 @@ export function ChapterReader({
 
   if (!chapter) {
     return (
-      <div className="flex items-center justify-center py-20 bg-[hsl(var(--reader-bg))]">
-        <p className="text-muted-foreground">No content available</p>
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted-foreground">Chapter not found</p>
       </div>
     );
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`min-h-screen bg-[hsl(var(--reader-bg))] text-[hsl(var(--reader-text))] ${className}`}
-      style={{ fontFamily: 'Bookerly, Georgia, serif' }}
-    >
+    <main className={`min-h-screen pb-48 bg-[hsl(var(--reader-bg))] ${className}`}>
       <article
-        className="max-w-xl mx-auto px-6 sm:px-8 py-12 text-[1.125rem] sm:text-[1.1875rem] md:text-[1.25rem] leading-[1.8]
-          [&>div>p]:mb-6
-          [&>div>p:last-child]:mb-0
-          [&>div>blockquote]:border-l-2 [&>div>blockquote]:border-current/20 [&>div>blockquote]:pl-6 [&>div>blockquote]:italic [&>div>blockquote]:my-6"
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    </div>
+        ref={contentRef}
+        className={`reader-content max-w-[42rem] mx-auto px-6 sm:px-8 md:px-12 pt-24 pb-16 transition-opacity duration-500 ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {chapter.title && (
+          <header className="mb-12 animate-fade-in">
+            <div className="flex items-center justify-center mb-6">
+              <div className="h-px w-12 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-semibold mb-4 text-center tracking-tight leading-tight text-[hsl(var(--reader-text))]">
+              {fixEncodingIssues(chapter.title)}
+            </h1>
+            <div className="flex items-center justify-center mt-6">
+              <div className="h-px w-12 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+            </div>
+          </header>
+        )}
+
+        <div
+          className="rich-epub-content text-[hsl(var(--reader-text))] animate-fade-in
+            [&_p]:mb-6 [&_p]:leading-[1.8] [&_p]:text-[1.125rem] sm:[&_p]:text-[1.1875rem] md:[&_p]:text-[1.25rem]
+            [&_h1]:text-2xl [&_h1]:font-serif [&_h1]:font-semibold [&_h1]:text-center [&_h1]:my-8
+            [&_h2]:text-xl [&_h2]:font-serif [&_h2]:text-center [&_h2]:my-6 [&_h2]:opacity-80
+            [&_h3]:text-lg [&_h3]:font-serif [&_h3]:text-center [&_h3]:my-6 [&_h3]:italic
+            [&_h4]:text-base [&_h4]:text-center [&_h4]:my-4 [&_h4]:opacity-60
+            [&_blockquote]:border-l-2 [&_blockquote]:border-current/20 [&_blockquote]:pl-6 [&_blockquote]:italic [&_blockquote]:my-6
+            [&_em]:italic [&_strong]:font-semibold
+            [&_ul]:list-disc [&_ul]:pl-8 [&_ul]:my-4
+            [&_ol]:list-decimal [&_ol]:pl-8 [&_ol]:my-4
+            [&_li]:mb-2
+            [&_hr]:my-8 [&_hr]:border-current/10
+            [&_img]:max-w-full [&_img]:h-auto [&_img]:mx-auto [&_img]:my-8 [&_img]:rounded-lg
+            [&_figure]:my-8 [&_figure]:text-center
+            [&_figcaption]:text-sm [&_figcaption]:opacity-60 [&_figcaption]:mt-2 [&_figcaption]:italic
+            [&_table]:w-full [&_table]:my-6 [&_table]:border-collapse
+            [&_td]:p-2 [&_td]:border [&_td]:border-current/10
+            [&_th]:p-2 [&_th]:border [&_th]:border-current/10 [&_th]:font-semibold
+            [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current/30
+            [&_pre]:bg-current/5 [&_pre]:p-4 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-4
+            [&_code]:font-mono [&_code]:text-sm"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+
+        <div
+          className="flex items-center justify-center mt-16 mb-8 animate-fade-in"
+          style={{ animationDelay: '600ms' }}
+        >
+          <div className="h-px w-24 bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+        </div>
+      </article>
+    </main>
   );
 }

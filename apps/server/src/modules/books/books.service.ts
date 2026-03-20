@@ -2,6 +2,7 @@ import { prisma } from '../../core/database';
 import { epubProcessor } from './epub.processor';
 import { readFile, deleteFile, saveFile } from '../../core/storage';
 import { openLibraryService } from './open-library.service';
+import { extractEpubAsset } from '@chapter/epub-parser';
 import type { AlternativeCover } from '@chapter/types';
 import path from 'path';
 
@@ -302,6 +303,28 @@ export class BooksService {
     }
 
     return { cleaned };
+  }
+
+  async getEpubAsset(
+    userId: string,
+    bookId: string,
+    chapterHref: string,
+    src: string
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const book = await this.getBookById(userId, bookId);
+
+    if (!book.filePath) {
+      throw new Error('EPUB file not found');
+    }
+
+    const epubBuffer = await readFile(book.filePath);
+    const result = await extractEpubAsset(epubBuffer, chapterHref, src);
+
+    if (!result) {
+      throw new Error('Asset not found in EPUB');
+    }
+
+    return result;
   }
 
   async setFavorite(userId: string, bookId: string, isFavorite: boolean): Promise<void> {
