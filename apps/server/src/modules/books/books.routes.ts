@@ -42,7 +42,7 @@ export const booksRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.addHook('onRequest', async (request, reply) => {
-    if (request.url.includes('/cover-proxy')) {
+    if (request.url.includes('/cover-proxy') || request.url.includes('/epub-asset')) {
       return;
     }
 
