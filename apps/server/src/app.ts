@@ -11,6 +11,7 @@ import { libraryRoutes } from './modules/library/library.routes';
 import { progressRoutes } from './modules/progress/progress.routes';
 import { usersRoutes } from './modules/users/users.routes';
 import { ttsRoutes } from './modules/tts/tts.routes';
+import { ttsManagerRoutes } from './modules/tts/tts-manager.routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -60,6 +61,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(progressRoutes, { prefix: '/api/progress' });
   await app.register(usersRoutes, { prefix: '/api/users' });
   await app.register(ttsRoutes, { prefix: '/api/tts' });
+  await app.register(ttsManagerRoutes, { prefix: '/api/tts' });
 
   return app;
 }

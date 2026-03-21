@@ -177,7 +177,7 @@ model TTSCache {
   id        String @id @default(cuid())
 
   // Chunk identification
-  contentHash   String @unique // Hash of text + provider + voice + settings
+  contentHash   String // Hash of text + voice + settings + chapterId + modelName
   bookId        String
   book          Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chapterId     String?
@@ -188,13 +188,14 @@ model TTSCache {
   endPosition   Int // Global character offset (end)
   textContent   String // Original text for this chunk
 
-  // Kokoro TTS info
-  voiceId       String // Kokoro voice ID
+  // TTS info
+  modelName     String  @default("kokoro") // TTS model that generated this audio
+  voiceId       String // Voice ID for the model
   settings      Json? // Speed, temperature, etc.
 
   // Audio file
   audioPath     String // Path to audio file
-  audioFormat   String @default("wav") // Kokoro outputs WAV
+  audioFormat   String @default("wav")
   audioSize     Int // File size in bytes
   audioDuration Float // Duration in seconds
 
@@ -208,9 +209,17 @@ model TTSCache {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([contentHash, modelName])
   @@index([contentHash])
   @@index([bookId])
   @@index([lastAccessed]) // For LRU eviction
+}
+
+model ActiveTTSModel {
+  id         String   @id @default(cuid())
+  modelName  String   @unique
+  serviceUrl String
+  loadedAt   DateTime @default(now())
 }
 
 model UserBook {

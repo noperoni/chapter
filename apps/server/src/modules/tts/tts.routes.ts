@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { kokoroService } from './kokoro.service';
+import { ttsRouterService } from './tts-router.service';
 import { audioCacheService } from './audio-cache.service';
 import { sentenceChunker } from './chunker';
 import { prisma } from '../../core/database';
@@ -35,7 +35,7 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/voices', async (request, reply) => {
     try {
-      const voices = kokoroService.getVoices();
+      const voices = await ttsRouterService.getVoices();
       return reply.send(voices);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch voices';
@@ -45,14 +45,15 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/health', async (request, reply) => {
     try {
-      const isHealthy = await kokoroService.healthCheck();
+      const isHealthy = await ttsRouterService.healthCheck();
+      const modelName = await ttsRouterService.getActiveModelName();
       if (isHealthy) {
-        return reply.send({ status: 'ok', service: 'kokoro' });
+        return reply.send({ status: 'ok', service: modelName });
       } else {
-        return reply.code(503).send({ status: 'unavailable', service: 'kokoro' });
+        return reply.code(503).send({ status: 'unavailable', service: modelName });
       }
     } catch (error) {
-      return reply.code(503).send({ status: 'error', service: 'kokoro' });
+      return reply.code(503).send({ status: 'error', service: 'unknown' });
     }
   });
 
@@ -69,7 +70,7 @@ export const ttsRoutes: FastifyPluginAsync = async (app) => {
       const sampleText =
         'The quick brown fox jumps over the lazy dog. This is a test of the text to speech system.';
 
-      const result = await kokoroService.generateSpeech({
+      const result = await ttsRouterService.generateSpeech({
         text: sampleText,
         voiceId: body.voiceId as any,
         settings: {

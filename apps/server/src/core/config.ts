@@ -28,7 +28,12 @@ export const config = {
 
   tts: {
     kokoroServiceUrl: process.env.KOKORO_SERVICE_URL || 'http://kokoro:5000',
-    defaultVoice: process.env.TTS_DEFAULT_VOICE || 'af_bella',
+    defaultVoice: process.env.TTS_DEFAULT_VOICE || 'af_heart',
+    defaultModel: process.env.TTS_DEFAULT_MODEL || 'kokoro',
+    namespace: process.env.TTS_NAMESPACE || 'myspace',
+    maxVramMB: parseInt(process.env.TTS_MAX_VRAM_MB || '20000', 10),
+    nvidiaDriverLibsPath: process.env.NVIDIA_DRIVER_LIBS_PATH || '/opt/nvidia-driver-libs/',
+    nodeSelector: process.env.TTS_NODE_SELECTOR || 'security-bastion',
   },
 
   library: {

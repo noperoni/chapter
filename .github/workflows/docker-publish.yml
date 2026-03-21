@@ -33,6 +33,21 @@ jobs:
           - image: chapter-kokoro
             dockerfile: services/kokoro/Dockerfile
             context: services/kokoro
+          - image: tts-kokoro
+            dockerfile: services/tts/kokoro/Dockerfile
+            context: services/tts/kokoro
+          - image: tts-orpheus
+            dockerfile: services/tts/orpheus/Dockerfile
+            context: services/tts/orpheus
+          - image: tts-chatterbox
+            dockerfile: services/tts/chatterbox/Dockerfile
+            context: services/tts/chatterbox
+          - image: tts-qwen3
+            dockerfile: services/tts/qwen3/Dockerfile
+            context: services/tts/qwen3
+          - image: tts-piper
+            dockerfile: services/tts/piper/Dockerfile
+            context: services/tts/piper
 
     steps:
       - name: Checkout repository

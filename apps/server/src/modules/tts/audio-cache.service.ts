@@ -2,7 +2,7 @@ import path from 'path';
 import { prisma } from '../../core/database';
 import { config } from '../../core/config';
 import { saveFile, readFile, deleteFile, getFileSize } from '../../core/storage';
-import { kokoroService } from './kokoro.service';
+import { ttsRouterService } from './tts-router.service';
 import { createCacheHash, TextChunk } from './chunker';
 import type { KokoroVoice, TTSSettings } from '@chapter/types';
 
@@ -34,20 +34,21 @@ export class AudioCacheService {
   }
 
   async getOrGenerateAudio(options: GenerateAudioOptions): Promise<CachedAudio> {
-    const contentHash = createCacheHash(options.text, options.voiceId, options.settings, options.chapterId);
+    const modelName = await ttsRouterService.getActiveModelName();
+    const contentHash = createCacheHash(options.text, options.voiceId, options.settings, options.chapterId, modelName);
 
-    const cached = await this.getCachedAudio(contentHash);
+    const cached = await this.getCachedAudio(contentHash, modelName);
     if (cached) {
       await this.updateAccessTime(cached.id);
       return cached;
     }
 
-    return await this.generateAndCache(options, contentHash);
+    return await this.generateAndCache(options, contentHash, modelName);
   }
 
-  private async getCachedAudio(contentHash: string): Promise<CachedAudio | null> {
-    const cached = await prisma.tTSCache.findUnique({
-      where: { contentHash },
+  private async getCachedAudio(contentHash: string, modelName?: string): Promise<CachedAudio | null> {
+    const cached = await prisma.tTSCache.findFirst({
+      where: { contentHash, ...(modelName ? { modelName } : {}) },
     });
 
     if (!cached) {
@@ -65,9 +66,10 @@ export class AudioCacheService {
 
   private async generateAndCache(
     options: GenerateAudioOptions,
-    contentHash: string
+    contentHash: string,
+    modelName: string = 'kokoro'
   ): Promise<CachedAudio> {
-    const ttsResult = await kokoroService.generateSpeech({
+    const ttsResult = await ttsRouterService.generateSpeech({
       text: options.text,
       voiceId: options.voiceId,
       settings: options.settings,
@@ -84,6 +86,7 @@ export class AudioCacheService {
       cached = await prisma.tTSCache.create({
         data: {
           contentHash,
+          modelName,
           bookId: options.bookId,
           chapterId: options.chapterId,
           startPosition: options.startPosition,
@@ -102,10 +105,10 @@ export class AudioCacheService {
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
-        // Duplicate contentHash — another request already cached this text.
+        // Duplicate contentHash+modelName — another request already cached this text.
         // Clean up the duplicate audio file and return the existing entry.
         try { await deleteFile(audioPath); } catch {}
-        const existing = await this.getCachedAudio(contentHash);
+        const existing = await this.getCachedAudio(contentHash, modelName);
         if (existing) return existing;
       }
       throw error;

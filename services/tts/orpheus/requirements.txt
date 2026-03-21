@@ -1,0 +1,4 @@
+flask==3.0.0
+orpheus-speech>=0.1.0
+vllm==0.7.3
+numpy>=1.24.0
