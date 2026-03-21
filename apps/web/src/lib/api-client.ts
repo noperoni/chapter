@@ -29,7 +29,12 @@ interface ModelWithStatusResponse {
     streaming: boolean;
     speedControl: boolean;
   };
-  voices: Array<{ id: string; name: string; gender: string; language: string }>;
+  voices: Array<{
+    id: string;
+    name: string;
+    gender: 'male' | 'female' | 'neutral';
+    language: string;
+  }>;
   languages: string[];
   license: string;
   status: ModelStatus;
