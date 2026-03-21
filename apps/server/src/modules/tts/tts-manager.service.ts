@@ -55,6 +55,36 @@ const LABELS = {
 // ---------------------------------------------------------------------------
 
 export class TTSManagerService {
+  // ---- Startup Sync ----
+
+  /**
+   * On startup, detect any existing TTS model deployments (e.g. the static
+   * tts-kokoro) and register them in the DB so the UI shows them as loaded.
+   */
+  async syncExistingModels(): Promise<void> {
+    try {
+      const models = getAllModels();
+      for (const model of models) {
+        const status = await this.getModelStatus(model.name);
+        if (status === 'loaded' || status === 'loading') {
+          const existing = await prisma.activeTTSModel.findUnique({
+            where: { modelName: model.name },
+          });
+          if (!existing) {
+            const serviceUrl = `http://tts-${model.name}.${NAMESPACE}.svc.cluster.local:${model.port}`;
+            await prisma.activeTTSModel.create({
+              data: { modelName: model.name, serviceUrl },
+            });
+            console.log(`[TTS Manager] Auto-registered existing deployment: ${model.name}`);
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal — k8s API may not be available in dev
+      console.warn('[TTS Manager] Could not sync existing models:', (e as Error).message);
+    }
+  }
+
   // ---- Registry ----
 
   getRegistry(): ModelRegistryEntry[] {

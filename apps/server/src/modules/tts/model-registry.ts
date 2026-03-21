@@ -81,7 +81,7 @@ const registry: ModelRegistryEntry[] = [
       streaming: false,
       speedControl: true,
     },
-    // All 55 Kokoro v1.0 voices
+    // All 54 Kokoro v1.0 voices
     voices: [
       // American English — Female (11)
       { id: 'af_heart', name: 'Heart', gender: 'female', language: 'en-US' },

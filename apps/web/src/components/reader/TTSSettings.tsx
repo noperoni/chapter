@@ -6,6 +6,7 @@ import { Slider } from '@base-ui/react/slider';
 import { useModelManager } from '@/lib/hooks/use-model-manager';
 import { useTTS } from '@/lib/hooks/use-tts';
 import { useSettingsStore } from '@/lib/stores/settings-store';
+import type { ModelWithStatus } from '@/lib/hooks/use-model-manager';
 import {
   Cpu,
   Zap,
@@ -31,7 +32,7 @@ function formatSize(bytes: number): string {
 }
 
 interface ModelCardProps {
-  model: any;
+  model: ModelWithStatus;
   isActive: boolean;
   isLoadingThis: boolean;
   onLoad: () => void;
@@ -312,7 +313,7 @@ export function TTSSettings() {
                             {LANGUAGE_LABELS[lang] || lang}
                           </div>
                         )}
-                        {langVoices.map((voice: any) => (
+                        {langVoices.map((voice) => (
                           <Select.Item
                             key={voice.id}
                             value={voice.id}

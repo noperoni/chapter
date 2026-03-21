@@ -4,9 +4,8 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
 import { ttsManagerService } from './tts-manager.service';
-import { ttsRouterService } from './tts-router.service';
+import { config } from '../../core/config';
 
 export const ttsManagerRoutes: FastifyPluginAsync = async (app) => {
   // All manager routes require authentication
@@ -54,7 +53,7 @@ export const ttsManagerRoutes: FastifyPluginAsync = async (app) => {
       if (!ttsManagerService.checkVRAMLimit(name)) {
         const model = ttsManagerService.getModelInfo(name);
         return reply.code(400).send({
-          error: `Model ${name} requires ${model?.vramMB || '?'}MB VRAM, limit is ${ttsManagerService['config']?.tts?.maxVramMB || 20000}MB`,
+          error: `Model ${name} requires ${model?.vramMB || '?'}MB VRAM, limit is ${config.tts.maxVramMB}MB`,
         });
       }
 
@@ -101,14 +100,4 @@ export const ttsManagerRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
-  // Get voices for active model (proxied)
-  app.get('/voices', async (_request, reply) => {
-    try {
-      const voices = await ttsRouterService.getVoices();
-      return reply.send(voices);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch voices';
-      return reply.code(500).send({ error: message });
-    }
-  });
 };

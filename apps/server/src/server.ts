@@ -3,6 +3,7 @@ import { config } from './core/config';
 import { connectDatabase, disconnectDatabase } from './core/database';
 import { disconnectRedis } from './core/redis';
 import { ensureStorageDirectories } from './core/storage';
+import { ttsManagerService } from './modules/tts/tts-manager.service';
 
 async function start() {
   try {
@@ -27,6 +28,9 @@ async function start() {
 
     console.log(`🚀 Server running on port ${config.port}`);
     console.log(`📚 Environment: ${config.nodeEnv}`);
+
+    // Sync existing TTS deployments (non-blocking)
+    ttsManagerService.syncExistingModels().catch(() => {});
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

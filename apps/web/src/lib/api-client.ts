@@ -13,6 +13,36 @@ import type {
   FolderScanStatus,
 } from '@chapter/types';
 
+type ModelStatus = 'available' | 'loading' | 'loaded' | 'error';
+
+interface ModelWithStatusResponse {
+  name: string;
+  displayName: string;
+  family: string;
+  description: string;
+  vramMB: number;
+  parameters: string;
+  gpu: boolean;
+  capabilities: {
+    voiceCloning: boolean;
+    emotionTags: boolean;
+    streaming: boolean;
+    speedControl: boolean;
+  };
+  voices: Array<{ id: string; name: string; gender: string; language: string }>;
+  languages: string[];
+  license: string;
+  status: ModelStatus;
+}
+
+interface ActiveModelResponse {
+  active: boolean;
+  modelName?: string;
+  serviceUrl?: string;
+  status?: ModelStatus;
+  displayName?: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class APIClient {
@@ -341,24 +371,24 @@ class APIClient {
   }
 
   // TTS Model Manager
-  async getModels(): Promise<any[]> {
-    return this.request<any[]>('/tts/models');
+  async getModels(): Promise<ModelWithStatusResponse[]> {
+    return this.request<ModelWithStatusResponse[]>('/tts/models');
   }
 
-  async getModel(name: string): Promise<any> {
-    return this.request<any>(`/tts/models/${name}`);
+  async getModel(name: string): Promise<ModelWithStatusResponse> {
+    return this.request<ModelWithStatusResponse>(`/tts/models/${name}`);
   }
 
   async loadModel(name: string): Promise<{ status: string; model: string }> {
-    return this.request('/tts/models/' + name + '/load', { method: 'POST' });
+    return this.request(`/tts/models/${name}/load`, { method: 'POST' });
   }
 
   async unloadModel(name: string): Promise<{ status: string; model: string }> {
-    return this.request('/tts/models/' + name + '/unload', { method: 'POST' });
+    return this.request(`/tts/models/${name}/unload`, { method: 'POST' });
   }
 
-  async getActiveModel(): Promise<any> {
-    return this.request<any>('/tts/active');
+  async getActiveModel(): Promise<ActiveModelResponse> {
+    return this.request<ActiveModelResponse>('/tts/active');
   }
 }
 

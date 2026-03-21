@@ -2,9 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api-client';
 
-type ModelStatus = 'available' | 'downloading' | 'loaded' | 'unloading' | 'error';
+export type ModelStatus = 'available' | 'loading' | 'loaded' | 'error';
 
-interface ModelWithStatus {
+export interface ModelWithStatus {
   name: string;
   displayName: string;
   family: string;
@@ -29,7 +29,7 @@ interface ModelWithStatus {
   status: ModelStatus;
 }
 
-interface ActiveModel {
+export interface ActiveModel {
   active: boolean;
   modelName?: string;
   serviceUrl?: string;
