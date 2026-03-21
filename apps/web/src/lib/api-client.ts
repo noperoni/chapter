@@ -339,6 +339,27 @@ class APIClient {
   async cleanMetadata(): Promise<{ cleaned: number }> {
     return this.request('/books/maintenance/clean-metadata', { method: 'POST' });
   }
+
+  // TTS Model Manager
+  async getModels(): Promise<any[]> {
+    return this.request<any[]>('/tts/models');
+  }
+
+  async getModel(name: string): Promise<any> {
+    return this.request<any>(`/tts/models/${name}`);
+  }
+
+  async loadModel(name: string): Promise<{ status: string; model: string }> {
+    return this.request('/tts/models/' + name + '/load', { method: 'POST' });
+  }
+
+  async unloadModel(name: string): Promise<{ status: string; model: string }> {
+    return this.request('/tts/models/' + name + '/unload', { method: 'POST' });
+  }
+
+  async getActiveModel(): Promise<any> {
+    return this.request<any>('/tts/active');
+  }
 }
 
 export const apiClient = new APIClient();

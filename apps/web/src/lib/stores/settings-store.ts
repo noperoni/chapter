@@ -5,6 +5,7 @@ export type Theme = 'light' | 'dark' | 'sepia';
 export type FontSize = 'small' | 'medium' | 'large';
 
 interface TTSSettings {
+  modelName: string;
   voiceId: string;
   speed: number;
   temperature: number;
@@ -25,6 +26,7 @@ export const useSettingsStore = create<SettingsState>()(
       theme: 'dark',
       fontSize: 'medium',
       tts: {
+        modelName: 'kokoro',
         voiceId: 'af_bella',
         speed: 1.0,
         temperature: 0.7,
