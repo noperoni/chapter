@@ -7,23 +7,18 @@
 import * as k8s from '@kubernetes/client-node';
 import { prisma } from '../../core/database';
 import { config } from '../../core/config';
-import {
-  getAllModels,
-  getModel,
-  isKnownModel,
-  type ModelRegistryEntry,
-} from './model-registry';
+import { getAllModels, getModel, isKnownModel, type ModelRegistryEntry } from './model-registry';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type ModelStatus =
-  | 'available'    // In registry, not deployed
-  | 'loading'      // Deployment exists, pod not ready
-  | 'loaded'       // Pod running and ready
-  | 'unloading'    // Deletion in progress
-  | 'error';       // Pod in error state
+  | 'available' // In registry, not deployed
+  | 'loading' // Deployment exists, pod not ready
+  | 'loaded' // Pod running and ready
+  | 'unloading' // Deletion in progress
+  | 'error'; // Pod in error state
 
 export interface ModelWithStatus extends ModelRegistryEntry {
   status: ModelStatus;
@@ -130,7 +125,9 @@ export class TTSManagerService {
           ...m,
           status,
           serviceUrl:
-            status === 'loaded' ? `http://tts-${m.name}.${NAMESPACE}.svc.cluster.local:${m.port}` : undefined,
+            status === 'loaded'
+              ? `http://tts-${m.name}.${NAMESPACE}.svc.cluster.local:${m.port}`
+              : undefined,
         };
       })
     );
@@ -243,7 +240,7 @@ export class TTSManagerService {
         { name: 'nvidia-dev-0', mountPath: '/dev/nvidia0' },
         { name: 'nvidiactl', mountPath: '/dev/nvidiactl' },
         { name: 'nvidia-uvm', mountPath: '/dev/nvidia-uvm' },
-        { name: 'nvidia-uvm-tools', mountPath: '/dev/nvidia-uvm-tools' },
+        { name: 'nvidia-uvm-tools', mountPath: '/dev/nvidia-uvm-tools' }
       );
 
       volumes.push(
@@ -251,7 +248,7 @@ export class TTSManagerService {
         { name: 'nvidia-dev-0', hostPath: { path: '/dev/nvidia0' } },
         { name: 'nvidiactl', hostPath: { path: '/dev/nvidiactl' } },
         { name: 'nvidia-uvm', hostPath: { path: '/dev/nvidia-uvm' } },
-        { name: 'nvidia-uvm-tools', hostPath: { path: '/dev/nvidia-uvm-tools' } },
+        { name: 'nvidia-uvm-tools', hostPath: { path: '/dev/nvidia-uvm-tools' } }
       );
     }
 
@@ -316,12 +313,11 @@ export class TTSManagerService {
       });
     } catch (e: any) {
       if (e?.statusCode === 409 || e?.response?.statusCode === 409) {
-        // Already exists — patch it instead
-        await appsApi.patchNamespacedDeployment({
-          name,
+        // Already exists — delete and recreate with desired state
+        await appsApi.deleteNamespacedDeployment({ name, namespace: NAMESPACE });
+        await appsApi.createNamespacedDeployment({
           namespace: NAMESPACE,
           body: deployment,
-          contentType: 'application/strategic-merge-patch+json',
         });
       } else {
         throw e;

@@ -56,9 +56,7 @@ export class TTSRouterService {
     const durationHeader = response.headers.get('X-Audio-Duration');
     const sampleRateHeader = response.headers.get('X-Sample-Rate');
 
-    const duration = durationHeader
-      ? parseFloat(durationHeader)
-      : this.estimateDuration(audioData);
+    const duration = durationHeader ? parseFloat(durationHeader) : this.estimateDuration(audioData);
 
     return {
       audioData,
@@ -78,7 +76,7 @@ export class TTSRouterService {
       const response = await fetch(`${serviceUrl}/voices`);
       if (!response.ok) throw new Error(`Failed to fetch voices: ${response.statusText}`);
 
-      const data = await response.json();
+      const data: any = await response.json(); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       // Normalize response — some models return an array directly,
       // others return { voices: [...] }

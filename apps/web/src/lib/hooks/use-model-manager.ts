@@ -98,10 +98,7 @@ export function useModelManager() {
     },
   });
 
-  const loadModel = useCallback(
-    (name: string) => loadMutation.mutateAsync(name),
-    [loadMutation]
-  );
+  const loadModel = useCallback((name: string) => loadMutation.mutateAsync(name), [loadMutation]);
 
   const unloadModel = useCallback(
     (name: string) => unloadMutation.mutateAsync(name),
@@ -109,7 +106,7 @@ export function useModelManager() {
   );
 
   return {
-    models: models || [],
+    models: (models ?? []) as ModelWithStatus[],
     activeModel: activeModel || { active: false },
     modelsLoading,
     activeLoading,
